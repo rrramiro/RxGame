@@ -18,8 +18,8 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-object Main extends App{
-    new Main().launch(args)
+object Main extends App {
+  new Main().launch(args)
 }
 
 class Main extends Application {
@@ -47,7 +47,7 @@ class Main extends Application {
 
     // Time
     val clock = Observable
-      .interval(initialDelay = 0 seconds, period = (1/60.0) second, scheduler)
+      .interval(initialDelay = 0 seconds, period = (1 / 60.0) second, scheduler)
       .map(_ => 1)
       .observeOn(PlatformScheduler())
 
@@ -56,24 +56,24 @@ class Main extends Application {
     val jumpSpeed = 8
 
     // Background
-    val sky = new Canvas(screenWidth,screenHeight) {
+    val sky = new Canvas(screenWidth, screenHeight) {
       root.getChildren.add(this)
       val context = getGraphicsContext2D
       context.setFill(Color.AZURE)
-      context.fillRect(0,0, screenWidth,screenHeight)
+      context.fillRect(0, 0, screenWidth, screenHeight)
     }
 
     // Grass
     val grassTile = new Image(s"$resourceDir/GrassBlock.png")
     val grassWidth = grassTile.getWidth
     val grassHeight = grassTile.getHeight
-    val nrTiles = math.ceil(screenWidth/grassWidth).asInstanceOf[Int]+1
+    val nrTiles = math.ceil(screenWidth / grassWidth).asInstanceOf[Int] + 1
 
     // Place tiles on bottom, spaced grassWidth apart
-    val grass = (0 to nrTiles-1).map(i => {
+    val grass = (0 until nrTiles).map(i => {
       val tile = new ImageView(grassTile)
       root.getChildren.add(tile)
-      tile.setTranslateX(i*grassWidth)
+      tile.setTranslateX(i * grassWidth)
       tile
     }).toList
 
@@ -82,10 +82,10 @@ class Main extends Application {
       grass.foreach(tile => {
 
         val dx = tile.getTranslateX
-        if(dx <= -grassWidth) {
-          tile.setTranslateX(screenWidth-v)
+        if (dx <= -grassWidth) {
+          tile.setTranslateX(screenWidth - v)
         } else {
-          tile.setTranslateX(dx-v)
+          tile.setTranslateX(dx - v)
         }
       })
     })
@@ -96,13 +96,13 @@ class Main extends Application {
     val heart = new ImageView(heartTile) {
 
       root.getChildren.add(this)
-      setTranslateY(-(screenHeight-200))
+      setTranslateY(-(screenHeight - 200))
 
       clock.map(_ => 3).subscribe(v => {
-        if(getTranslateX <= -heartTile.getWidth) {
-          setTranslateX(screenWidth-v)
+        if (getTranslateX <= -heartTile.getWidth) {
+          setTranslateX(screenWidth - v)
         } else {
-          setTranslateX(getTranslateX-v)
+          setTranslateX(getTranslateX - v)
         }
       })
     }
@@ -120,29 +120,28 @@ class Main extends Application {
       //
 
       val velocity: Observable[Double] = jumps.flatMap(v0 =>
-        clock.scan(v0)((v,_)=>v-gravity)
-             .map(v => if(v < -v0) 0 else v)
-            .distinctUntilChanged
-            .takeUntil(jumps)
-      )
+        clock.scan(v0)((v, _) => v - gravity)
+          .map(v => if (v < -v0) 0 else v)
+          .distinctUntilChanged
+          .takeUntil(jumps))
     }
 
     root.getChildren.add(bug)
-    val bugHomeY = (-grassHeight/2)-5
+    val bugHomeY = (-grassHeight / 2) - 5
     bug.setTranslateY(bugHomeY)
-    bug.setTranslateX(screenHeight/2)
+    bug.setTranslateX(screenHeight / 2)
 
     bug.velocity.subscribe(dy => {
-       bug.setTranslateY(bug.getTranslateY-dy)
+      bug.setTranslateY(bug.getTranslateY - dy)
     })
 
     spaceBar
-      .filter(_ => bugHomeY-1 <= bug.getTranslateY)
+      .filter(_ => bugHomeY - 1 <= bug.getTranslateY)
       .doOnEach(_ => {
-      new javafx.scene.media.AudioClip (s"$resourceDir/smb3_jump.wav").play()
-    }).subscribe(_ => {
-       bug.jumps.onNext(jumpSpeed)
-    })
+        new javafx.scene.media.AudioClip(s"$resourceDir/smb3_jump.wav").play()
+      }).subscribe(_ => {
+        bug.jumps.onNext(jumpSpeed)
+      })
 
     enterKey.subscribe(_ => {
       scheduler match {
@@ -153,19 +152,18 @@ class Main extends Application {
     val heartPosition: Observable[Bounds] = clock.map(_ => heart.localToScene(heart.getLayoutBounds))
     val bugPosition: Observable[Bounds] = clock.map(_ => bug.localToScene(bug.getLayoutBounds))
 
-
     bugPosition.combineLatestWith(heartPosition)((bug: Bounds, heart: Bounds) => bug.intersects(heart))
-      .slidingBuffer(2,1)
-      .filter(hits => hits(0) != hits(1))
+      .slidingBuffer(2, 1)
+      .filter(hits => hits.head != hits(1))
       .subscribe(hits => {
-        if(!hits(0)) {
+        if (!hits.head) {
           heart.setImage(starTile)
           new javafx.scene.media.AudioClip(s"$resourceDir/smb3_coin.wav").play()
         }
-        if(!hits(1)) {
+        if (!hits(1)) {
           heart.setImage(heartTile)
         }
-    })
+      })
 
     stage.setOnShown(new EventHandler[WindowEvent] {
       def handle(e: WindowEvent) = {
@@ -181,9 +179,9 @@ class Main extends Application {
 
 package object utils {
 
-  def keyPress (implicit scene: Scene) = Observable.create[KeyEvent](observer => {
+  def keyPress(implicit scene: Scene) = Observable.apply[KeyEvent](observer => {
     val handler = new EventHandler[input.KeyEvent] {
-      def handle(e: input.KeyEvent): Unit  = observer.onNext(e)
+      def handle(e: input.KeyEvent): Unit = observer.onNext(e)
     }
     scene.addEventHandler(KeyEvent.KEY_PRESSED, handler)
     Subscription { scene.removeEventHandler(KeyEvent.KEY_PRESSED, handler) }
