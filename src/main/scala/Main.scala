@@ -1,26 +1,25 @@
+import java.util.concurrent.Executors
+import javafx.application._
 import javafx.event._
 import javafx.geometry._
-import javafx.scene.canvas.Canvas
-import javafx.scene.input._
-import javafx.scene.paint.Color
 import javafx.scene._
+import javafx.scene.canvas.Canvas
 import javafx.scene.image._
+import javafx.scene.input._
 import javafx.scene.layout.StackPane
+import javafx.scene.paint.Color
 import javafx.stage._
-import javafx.application._
-import rx.functions.Action1
-import rx.lang.scala.schedulers._
+
 import rx.lang.scala._
-import rx.Scheduler.Inner
-import scala.language.postfixOps
-import scala.concurrent.duration._
+import rx.lang.scala.schedulers._
 import utils._
 
-object Main {
-  def main(args: Array[String]) {
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
+object Main extends App{
     new Main().launch(args)
-  }
 }
 
 class Main extends Application {
@@ -28,7 +27,7 @@ class Main extends Application {
   //val scheduler = NewThreadScheduler()
   val scheduler = TestScheduler()
 
-  val resourceDir = s"file:///${System.getProperty("user.dir")}/resources"
+  val resourceDir = s"file:///${System.getProperty("user.dir")}/src/main/resources"
 
   def launch(args: Array[String]) = Application.launch()
 
@@ -48,7 +47,7 @@ class Main extends Application {
 
     // Time
     val clock = Observable
-      .timer(initialDelay = 0 seconds, period = (1/60.0) second, scheduler)
+      .interval(initialDelay = 0 seconds, period = (1/60.0) second, scheduler)
       .map(_ => 1)
       .observeOn(PlatformScheduler())
 
@@ -154,8 +153,9 @@ class Main extends Application {
     val heartPosition: Observable[Bounds] = clock.map(_ => heart.localToScene(heart.getLayoutBounds))
     val bugPosition: Observable[Bounds] = clock.map(_ => bug.localToScene(bug.getLayoutBounds))
 
-    bugPosition.combineLatest(heartPosition, (bug: Bounds, heart: Bounds) => bug.intersects(heart))
-      .buffer(2,1)
+
+    bugPosition.combineLatestWith(heartPosition)((bug: Bounds, heart: Bounds) => bug.intersects(heart))
+      .slidingBuffer(2,1)
       .filter(hits => hits(0) != hits(1))
       .subscribe(hits => {
         if(!hits(0)) {
@@ -196,38 +196,9 @@ package object utils {
 
 object PlatformScheduler {
 
-  def apply(): Scheduler = rx.lang.scala.JavaConversions.javaSchedulerToScalaScheduler(s)
+  val e = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor)
+  val s: ExecutionContextScheduler = ExecutionContextScheduler(e)
 
-  val s = new rx.Scheduler {
+  def apply(): Scheduler = s
 
-    def inner: Inner = new Inner {
-
-      val subscription = Subscription{}
-      def unsubscribe() = subscription.unsubscribe()
-      def isUnsubscribed = subscription.isUnsubscribed
-
-      def schedule(action: Action1[Inner]) = if(!isUnsubscribed) Platform.runLater(new Runnable {
-        def run() =
-          if(!isUnsubscribed) action.call(inner)
-      })
-
-      def schedule(action: Action1[Inner], delayTime: Long, unit: TimeUnit) =
-        schedule(new Action1[Inner] {
-          def call(t1: Inner) = {
-            if(!isUnsubscribed) Thread.sleep(Duration(delayTime, unit).toMillis)
-            if(!isUnsubscribed) action.call(t1)
-          }
-        })
-    }
-
-    def schedule(action: Action1[Inner], delayTime: Long, unit: TimeUnit) = {
-      inner.schedule(action, delayTime, unit)
-      inner
-    }
-
-    def schedule(action: Action1[Inner]): rx.Subscription = {
-      inner.schedule(action)
-      inner
-    }
-  }
 }
